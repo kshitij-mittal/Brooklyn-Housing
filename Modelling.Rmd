@@ -1,5 +1,5 @@
 ---
-title: "Modelling"
+title: "Brooklyn Housing - Modelling Codebase"
 author: "Kshitij Mittal"
 date: "2022-12-18"
 output: html_document
@@ -10,7 +10,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Calling Relevant Packages
+## Calling Relevant Packages
 ```{r packages}
 library(dplyr)
 library(stringr)
@@ -148,19 +148,12 @@ data_comb4 = data_comb4[!is.na(data_comb4$price),]
 # Step 2: EDA and feature engineering 
 
 ```{r EDA}
-# Your goal will be to use linear regression to explain Brooklyn housing prices 
-# within the 2016-2020 window.  You will be asked to make predictions for the 
-# sale prices within the dataset.  You are encouraged to think of ways to get the 
-# most explanatory power out of your current variables. 
+# Our goal will be to use linear regression to explain Brooklyn housing prices 
+# within the 2016-2020 window.  We will make predictions for the 
+# sale prices within this dataset, and extract most explanatory power out of our variables.
 
-# 2.1 Exploratory data analysis 
-
-# Consider price as a potential response variable.  Examine how it is 
-# distributed, and how it associates with the other variables in your data.  
-# Think about how you would use these other variables to explain price.  Consider 
-# whether each variable should enter as a continuous numeric predictor, or as a factor.  
-# Consider transformations of your response variable, transformations of your predictors, or both.  
-# Use this exploratory data analysis to revisit your initial data cleaning steps, which might need revision. 
+# Consider price as a potential response variable. Examining how it is 
+# distributed, and how it associates with the other variables in our data.  
 
 data_mod = data_comb4
 ggplot(data_mod[data_mod$price<5000000,], aes(x=price)) + geom_histogram(bins = 100) + ggtitle("Spread of Selling Price")
@@ -249,7 +242,7 @@ data_mod2[,factcols] = lapply(data_mod2[,factcols],factor)
 str(data_mod2)
 ```
 
-## Initial Modelling - without transformations
+## 3.0 Initial Modelling - without transformations
 ```{r Naive_models}
 naive.lm2 = lm(price~neighborhood+bldclasscat+taxclasscurr+bldclasscurr+landsqft+grosssqft+taxclasssale+bldclasssale+locality+quarter, data = data_mod2)
 summary(naive.lm2)
@@ -277,7 +270,7 @@ ggplot(data_mod[data_mod$price<10000000,], aes(x=sqrt(price))) + geom_histogram(
 
 ```
 
-## Continuing with feature engineering
+## 3.1 Continuing with feature engineering
 
 ```{r Cont_Feature_Engineering}
 # For experimenting - trying year and quarter separately also
@@ -309,7 +302,7 @@ data_mod2$new_neigh_level = as.factor(ifelse(data_mod2$neighborhood %in% new_nei
 
 ```
 
-## Intermediate Models - Deprioritized
+## 3.2 Intermediate Models - Deprioritized
 ```{r Int_Models}
 
 trans.lm6 = lm(I(sqrt(price))~new_neigh_level+bldclasscat+(landsqft*I(log(grosssqft)))+locality+yearsl+quartf, data = data_mod2)
@@ -367,9 +360,8 @@ summary(trans.lm10)
 
 ```
 
-## Final Model - Trans.lm12
+# 3.3 Final Model
 ```{r Fin_Model}
-
 ##  Reducing Modelling data to exclude price outliers
 summary(data_mod2$price)
 boxplot(data_mod2$price, data=data_mod2)
