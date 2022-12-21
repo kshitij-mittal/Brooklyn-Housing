@@ -1,0 +1,158 @@
+---
+title: "Statistical Analysis - Final Assignment Part 2"
+author: "Kshitij Mittal"
+date: "2022-12-09"
+output: pdf_document
+---
+
+#In Continuation with the code for Part 1
+
+## Importing Relevant Packages
+
+```{r setup, include=FALSE}
+library(ggplot2)        # plotting & data
+library(dplyr)          # data manipulation
+library(tidyr)          # data re-shaping
+library(gridExtra)      # provides side-by-side plotting
+```
+
+## Creating a new data frame with fitted prices and residuals
+```{r}
+data_mod4 = read.csv('/Users/kshitijmittal/Documents/UChicago Acad/01 Quarter 1/01 Stat Analysis/99 Final Project Part 2/modelling_data.csv')
+trans.lm12 = lm(I(sqrt(price))~new_neigh_level+bldclasscat+I(log(1+landsqft))+I(log(grosssqft))+locality+quarter, data = data_mod4)
+
+mod_preds = data.frame(data_mod4$date, data_mod4$quarter, data_mod4$price, (trans.lm12$fitted.values)^2,(trans.lm12$fitted.values)^2-data_mod4$price)
+colnames(mod_preds) = c('date','quarter','price','fitted_price','residual')
+
+mod_preds_f=mod_preds[(mod_preds$quarter=="2020_Q3"|mod_preds$quarter=="2020_Q4"),]
+head(mod_preds_f)
+```
+
+## Analyzing difference between Q3 2020 and Q4 2020 using our linear regression model
+
+```{r}
+# Checking coefficients for our final model (trans.lm12)
+
+q_coeffs=data.frame(trans.lm12$coefficients[23:41])
+q_coeffs$quarter=as.factor(substr(rownames(q_coeffs),8,14))
+colnames(q_coeffs)=c('coefficient','quarter')
+q_coeffs
+
+#plot(trans.lm12$coefficients[23:41])
+ggplot(data = q_coeffs, aes(x=as.factor(quarter), y=coefficient)) + geom_bar(stat = "identity", fill="#0073C2FF") +  xlab("Year-Quarter") + ylab("Coefficient") + ggtitle("Spread of Model coefficients across quarters") +   
+  geom_label(data=q_coeffs %>% filter(quarter=="2020_Q3"|quarter=="2020_Q4"),aes(label=floor(coefficient)),y_nudge=1) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+```
+## Keeping Quarter 1 as the reference, we can see that coefficients for the model are subsequently increasing as quarters pass. 
+## For the year 2020, the coefficient takes a sharp jump between Q3(106) to Q4(144) 
+
+## This means that if all the other variables were controlled, a price for a house would jump between these two quarters
+
+
+## Simulating this test by identifying houses sold in Q3 2020, and predicting prices if only the quarter variable was changed
+
+```{r}
+houses_2020Q3=data_mod4[data_mod4$quarter=="2020_Q3",]
+houses_2020Q3_dummy = houses_2020Q3
+houses_2020Q3_dummy$quarter = "2020_Q4"
+
+head(houses_2020Q3)
+head(houses_2020Q3_dummy)
+```
+
+# Making the prediction on this new dummy data set
+```{r}
+dummy_pred_2020Q3=predict(trans.lm12, newdata = houses_2020Q3_dummy)
+dummy_pred_2020Q3
+```
+## Calculating the price deltas between 2020 Q3 and 2020 Q4
+```{r}
+mod_preds_2020Q3=mod_preds_f[mod_preds_f$quarter=="2020_Q3",]
+mod_preds_2020Q3$fitted_price_2020Q4 = (dummy_pred_2020Q3)^2
+mod_preds_2020Q3$price_delta = mod_preds_2020Q3$fitted_price_2020Q4 - mod_preds_2020Q3$fitted_price
+head(mod_preds_2020Q3)
+summary(mod_preds_f[mod_preds_f$quarter=="2020_Q4",]$price)
+```
+
+## Plotting the increase in prices from Q3 2020 to Q4 2024
+```{r}
+
+ggplot() +
+  geom_line(data = mod_preds_2020Q3, mapping = aes(x=price, y=fitted_price, color="red")) + 
+  geom_line(data = mod_preds_2020Q3, mapping = aes(x=price, y=fitted_price_2020Q4, color="blue")) +
+  theme(legend.position = "none") +
+  ggtitle("Difference between fitted prices for the same houses between \nQ3-2020 (blue) and Q4-2020 (red)") +   xlab("Houses") + ylab("Fitted Prices")
+
+```
+```{r, echo=FALSE}
+
+ggplot() +
+  geom_smooth(data = mod_preds_2020Q3, mapping = aes(x=price, y=fitted_price, color="red")) + 
+  geom_smooth(data = mod_preds_2020Q3, mapping = aes(x=price, y=fitted_price_2020Q4, color="blue")) +
+  theme(legend.position = "none") +
+  ggtitle("Difference between fitted prices for the same houses between \nQ3-2020 (blue) and Q4-2020 (red)") +   xlab("Houses") + ylab("Fitted Prices")
+
+```
+
+## Analyzing the spread of price deltas
+
+```{r, echo=FALSE}
+plt4 = ggplot(mod_preds_2020Q3, aes(price_delta)) + geom_histogram(fill = "white", color="grey30") + ggtitle("Spread of price deltas") + xlab("Price") + ylab("")
+plt5 = ggplot(mod_preds_2020Q3, aes(sqrt(price_delta))) + geom_histogram(fill = "white", color="grey30") + ggtitle("Spread of sqrt(price) deltas") + xlab("Sqrt(Price)") + ylab("")
+
+grid.arrange(plt4, plt5, ncol = 2)
+
+
+```
+
+#Calculating 95% Confidence Intervals for Price Delta
+```{r, echo=FALSE}
+m_del_price = mean(mod_preds_2020Q3$price_delta)
+sd_del_price = sd(mod_preds_2020Q3$price_delta)
+n_del_price = length(mod_preds_2020Q3$price_delta)
+std_err_del_price = (qnorm(0.975) * sd_del_price)/sqrt(n_del_price)
+
+left_del_price = m_del_price - std_err_del_price
+left_del_price
+
+right_del_price = m_del_price + std_err_del_price
+right_del_price
+```
+
+
+# Further Validation
+## First comparing the prices for Q3 2020 and Q4 2020 from original data
+
+```{r}
+summary(data_mod4[data_mod4$quarter=="2020_Q3",]$price)
+summary(data_mod4[data_mod4$quarter=="2020_Q4",]$price)
+```
+
+### We can see that there is some movement in price between 2020_Q3 and 2020_Q4
+
+## Plotting these prices
+```{r, echo=FALSE}
+ggplot(mod_preds_f, aes(x=price, color=quarter, fill=quarter))+geom_density(alpha=0.3)
+ggplot(mod_preds_f, aes(x=price, color=quarter, fill=quarter))+geom_boxplot(alpha=0.3)
+```
+## Plotting histograms for these prices (and their sqrt transformations)
+
+```{r, echo=FALSE}
+p1 = ggplot(mod_preds_f, aes(price)) + geom_histogram(fill = "white", color="grey30") + facet_wrap(~ quarter)
+p2 = ggplot(mod_preds_f, aes(sqrt(price))) + geom_histogram(fill = "white", color="grey30") + facet_wrap(~ quarter)
+grid.arrange(p1, p2, nrow = 2)
+```
+
+## Two-sample t-test
+### Comparing the difference between actual housing prices of Q3 2020 and Q4 2020 using Welch's T-Test
+
+```{r}
+t.test(price~quarter, data = mod_preds_f)
+```
+When comparing prices directly, we were getting a p-value>0.01. This made us unable to reject the null hypothesis  that there is a statistically significant difference between prices along the two quarters.
+
+### Comparing the difference between sqrt(housing prices)  of Q3 2020 and Q4 2020 using Welch's T-Test
+```{r}
+t.test(sqrt(price)~quarter, data = mod_preds_f)
+```
+However, when we compare the sqrt transformation of prices across two quarters, we do see a statistically significant difference (p-value = 0.044). This became an essential insight, as we are using our model to predict sqrt transformation of prices. In later steps we are squaring them to a price metric for gauging deltas.
